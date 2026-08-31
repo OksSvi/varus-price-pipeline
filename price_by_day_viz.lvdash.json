@@ -1,0 +1,101 @@
+{
+  "datasets": [
+    {
+      "name": "d16fea0a",
+      "displayName": "Product Pricing and Details Snapshot Dataset",
+      "queryLines": [
+        "SELECT sku_code, product_name, brand, categories, scraped_date, scraped_at, price\n",
+        "FROM (\n",
+        "    SELECT \n",
+        "        d.sku_code, d.product_name, d.brand, d.categories,\n",
+        "        f.scraped_date, f.scraped_at, f.price,\n",
+        "        ROW_NUMBER() OVER (\n",
+        "            PARTITION BY f.product_id, f.scraped_date \n",
+        "            ORDER BY f.scraped_at DESC\n",
+        "        ) AS rn\n",
+        "    FROM gold_db.dim_products d\n",
+        "    JOIN gold_db.fct_prices f USING (product_id)\n",
+        ")\n",
+        "WHERE rn = 1\n",
+        "ORDER BY sku_code, scraped_date"
+      ]
+    }
+  ],
+  "pages": [
+    {
+      "name": "8f3ccf2c",
+      "displayName": "VIZ",
+      "layout": [
+        {
+          "widget": {
+            "name": "97602e54",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "d16fea0a",
+                  "fields": [
+                    {
+                      "name": "product_name",
+                      "expression": "`product_name`"
+                    },
+                    {
+                      "name": "scraped_date",
+                      "expression": "`scraped_date`"
+                    },
+                    {
+                      "name": "price",
+                      "expression": "`price`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "scraped_date",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "price",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "product_name",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 2,
+            "y": 0,
+            "width": 10,
+            "height": 8
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1"
+    }
+  ],
+  "uiSettings": {
+    "theme": {
+      "widgetHeaderAlignment": "ALIGNMENT_UNSPECIFIED"
+    },
+    "applyModeEnabled": false
+  }
+}
