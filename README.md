@@ -35,6 +35,9 @@ and easy manual inspection.
 
 **Visualization** — a Lakeview Dashboard built on the Gold layer shows price history per product over time.
 
+<img width="1510" height="944" alt="image" src="https://github.com/user-attachments/assets/20cca047-8823-420c-916c-877a7972d0ae" />
+
+
 ## Star Schema (Gold layer)
 
 The Gold layer follows a simple star schema: one dimension table describing *what* a product is, and one fact table recording *price observations* over time, joined on `product_id`.
