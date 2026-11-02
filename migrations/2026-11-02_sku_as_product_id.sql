@@ -1,5 +1,8 @@
+-- Databricks notebook source
 -- Migration: product_id = sku (brand removed from key)
--- Run AFTER merging this PR, BEFORE the next scheduled pipeline run.
+-- Run before the first pipeline run on the new code.
+
+-- COMMAND ----------
 
 CREATE OR REPLACE TABLE gold_db.dim_products (
     product_id STRING,
@@ -14,6 +17,10 @@ CREATE OR REPLACE TABLE gold_db.dim_products (
 USING DELTA
 LOCATION 's3a://aws-scraping-test-oks/gold/dim_products/';
 
+-- COMMAND ----------
+
 TRUNCATE TABLE gold_db.fct_prices;
+
+-- COMMAND ----------
 
 -- Then run 03_silver_gold to repopulate.
