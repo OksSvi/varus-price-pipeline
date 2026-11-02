@@ -16,7 +16,7 @@ A Databricks / Delta Lake ETL pipeline that scrapes product prices from https://
         ▼
 03_silver_gold           Builds dim_products and fct_prices (Delta)
         │
-        ├──▶ 04_visualization      Dashboard: price trends per product over time
+        ├──▶ 04_visualization      Lakeview Dashboard: price trends per product over time
 
 ```
 
@@ -26,7 +26,7 @@ and easy manual inspection.
 **Silver** — `gold_db.silver_products`: cleaned and type-cast (price → `DOUBLE`, scraped_at → `TIMESTAMP`), deduplicated on `(sku, scraped_at)`.
 
 **Gold**
-- `gold_db.dim_products` — one row per product (`product_id = md5(sku + brand)`), with `first_seen_date` / `last_seen_date`.
+- `gold_db.dim_products` — one row per product (product_id = sku), with `first_seen_date` / `last_seen_date`; if there are duplicated values, the most recent (by `scraped_at`) is used
 - `gold_db.fct_prices` — price history per product, keyed by `price_id`, populated via idempotent `MERGE`.
 
 **Storage & access** — all tables are external Delta tables on S3, accessed through a Unity Catalog External Location. No AWS credentials are stored in code; access is authorized entirely through Unity Catalog.
@@ -43,17 +43,17 @@ and easy manual inspection.
 The Gold layer follows a simple star schema: one dimension table describing *what* a product is, and one fact table recording *price observations* over time, joined on `product_id`.
 
 ```
-        gold_db.dim_products                    gold_db.fct_prices
-   ┌───────────────────────────┐          ┌───────────────────────────┐
-   │ product_id (PK)           │◄─────────│ product_id (FK)           │
-   │ sku_code                  │          │ price_id (PK)             │
-   │ product_name              │          │ scraped_date              │
-   │ brand                     │          │ scraped_at                │
-   │ category_path             │          │ price                     │
-   │ categories                │          └───────────────────────────┘
-   │ first_seen_date           │
-   │ last_seen_date            │
-   └───────────────────────────┘
+        gold_db.dim_products                     gold_db.fct_prices
+┌───────────────────────────┐          ┌───────────────────────────┐
+│ product_id (PK)           │◄─────────│ product_id (FK)           │
+│ product_name              │          │ price_id (PK)             │
+│ brand                     │          │ scraped_date              │
+│ category_path             │          │ scraped_at                │
+│ categories                │          │ price                     │
+│ product_url               │          └───────────────────────────┘
+│ first_seen_date           │
+│ last_seen_date            │
+└───────────────────────────┘
 ```
 
 - **`dim_products`** — one row per product. Slowly-changing attributes (name, brand, category) plus `first_seen_date` / `last_seen_date` to track how long a product has been observed. Rebuilt with `INSERT OVERWRITE` on every run.
@@ -74,7 +74,7 @@ This separation keeps product attributes (which rarely change) out of the price 
 
 **DDL separated from DML.** Table creation lives entirely in `00_setup_ddl`, run once. The other notebooks only read and write data — they never create or alter table schemas. This avoids the two ETL notebooks silently redefining the same table in incompatible ways (an early version of this pipeline had `silver_products` created both as a managed Delta table via `saveAsTable` and, separately, as an external Parquet table — this split removes that entire class of bug).
 
-**`MERGE` instead of `INSERT INTO` for `fct_prices`.** The Silver layer is fully rebuilt (`overwrite`) on every run and always contains the full scraped history, not just new rows. A plain `INSERT INTO` on every Gold run would therefore re-insert the entire price history on every single execution, multiplying duplicates with each run. `MERGE` keyed on `price_id` makes the Gold build idempotent — rerunning the pipeline any number of times converges to the same result.
+**`MERGE` instead of `INSERT INTO` for `fct_prices`.** `silver_products` accumulates the full scraped history, and the Gold build reads all of it on every run, not just today’s rows. A plain INSERT INTO would therefore re-insert the entire price history on every execution, multiplying duplicates. MERGE keyed on price_id (a hash of sku and scraped_at) inserts only observations that are not yet in the table. Rerunning the pipeline any number of times, or repairing a failed run, converges to the same result.
 
 **No hardcoded AWS credentials.** An early version of the scraper authenticated to S3 with a hardcoded access key and secret. Since Unity Catalog was already available, this was replaced with a Unity Catalog External Location: notebooks read/write via `s3a://` paths and Spark/`dbutils.fs` handle authorization transparently — no secrets in code.
 
