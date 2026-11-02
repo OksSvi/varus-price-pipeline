@@ -4,10 +4,10 @@
       "name": "d16fea0a",
       "displayName": "Product Pricing and Details Snapshot Dataset",
       "queryLines": [
-        "SELECT sku_code, product_name, brand, categories, scraped_date, scraped_at, price\n",
+        "SELECT product_id, product_name, brand, categories, scraped_date, scraped_at, price\n",
         "FROM (\n",
         "    SELECT \n",
-        "        d.sku_code, d.product_name, d.brand, d.categories,\n",
+        "        d.product_id, d.product_name, d.brand, d.categories,\n",
         "        f.scraped_date, f.scraped_at, f.price,\n",
         "        ROW_NUMBER() OVER (\n",
         "            PARTITION BY f.product_id, f.scraped_date \n",
@@ -17,7 +17,7 @@
         "    JOIN gold_db.fct_prices f USING (product_id)\n",
         ")\n",
         "WHERE rn = 1\n",
-        "ORDER BY sku_code, scraped_date"
+        "ORDER BY product_id, scraped_date"
       ]
     }
   ],
