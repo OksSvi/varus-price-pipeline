@@ -76,6 +76,12 @@ This separation keeps product attributes (which rarely change) out of the price 
 
 **`MERGE` instead of `INSERT INTO` for `fct_prices`.** `silver_products` accumulates the full scraped history, and the Gold build reads all of it on every run, not just today’s rows. A plain INSERT INTO would therefore re-insert the entire price history on every execution, multiplying duplicates. MERGE keyed on price_id (a hash of sku and scraped_at) inserts only observations that are not yet in the table. Rerunning the pipeline any number of times, or repairing a failed run, converges to the same result.
 
+**Product attributes: SCD Type 1, history kept upstream.** `dim_products` stores only the latest name, brand, category and URL for each product (`max_by(..., scraped_at)` per `sku`), so a renamed product appears under its current name across the whole
+price history. Earlier versions are not lost: every observation lives in
+`silver_products`, and the raw JSON stays in Bronze unchanged, so a Type 2
+dimension (`valid_from` / `valid_to`) can be rebuilt later without re-scraping.
+Type 2 was left out because the dashboard tracks price trends, not catalog changes.
+
 **No hardcoded AWS credentials.** An early version of the scraper authenticated to S3 with a hardcoded access key and secret. Since Unity Catalog was already available, this was replaced with a Unity Catalog External Location: notebooks read/write via `s3a://` paths and Spark/`dbutils.fs` handle authorization transparently — no secrets in code.
 
 **`s3a://` everywhere, not `s3://`.** `s3a://` is the actively maintained Hadoop-AWS connector; `s3://` is a legacy/ambiguous scheme whose behavior depends on cluster configuration. All table locations and read paths were unified on `s3a://`.
